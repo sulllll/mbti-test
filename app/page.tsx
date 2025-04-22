@@ -3,11 +3,12 @@
 import { Button } from "@/app/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/app/components/ui/card";
 import Link from "next/link";
+import CommentSection from "@/app/components/CommentSection";
 
 export default function Home() {
   return (
     <main className="min-h-screen flex flex-col items-center justify-center p-4 space-bg">
-      <Card className="w-full max-w-md mx-auto shadow-lg">
+      <Card className="w-full max-w-md mx-auto shadow-lg mb-4">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">MBTI 성격 유형 검사</CardTitle>
           <CardDescription className="mt-2">
@@ -32,6 +33,8 @@ export default function Home() {
           </Link>
         </CardFooter>
       </Card>
+      
+      <CommentSection />
       
       <div className="absolute bottom-4 left-0 right-0 text-center text-white/50 text-sm">
         <p>MBTI 테스트 ✨</p>
