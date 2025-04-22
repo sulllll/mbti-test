@@ -16,7 +16,8 @@ type MBTIStats = {
 
 // 댓글 타입 정의
 type Comment = {
-  id: string;
+  id?: string;
+  _id?: string;
   nickname: string;
   content: string;
   timestamp: number;
@@ -51,6 +52,9 @@ export const ResultCard = () => {
   // 모달 상태 관리
   const [commentModalOpen, setCommentModalOpen] = useState(false);
 
+  // 로딩 상태 추가
+  const [isLoading, setIsLoading] = useState(false);
+
   const mbtiResult = getMBTIResult(result);
 
   // 테스트 결과 저장 및 통계 로드
@@ -75,42 +79,76 @@ export const ResultCard = () => {
     }
   }, [result]);
 
-  // 댓글 로드 함수
-  const loadComments = () => {
-    const storedComments = localStorage.getItem('mbti-comments');
-    if (storedComments) {
-      const parsedComments = JSON.parse(storedComments);
-      // 기존 댓글에 rating 필드가 없는 경우 기본값 5를 추가
-      const updatedComments = parsedComments.map((comment: any) => ({
-        ...comment,
-        rating: comment.rating !== undefined ? comment.rating : 5
-      }));
-      setComments(updatedComments);
+  // 댓글 로드 함수 수정
+  const loadComments = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/comments');
+      
+      if (!response.ok) {
+        throw new Error('댓글을 가져오는데 실패했습니다');
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setComments(data.data);
+      } else {
+        console.error('댓글 로드 실패:', data.message);
+      }
+    } catch (error) {
+      console.error('댓글 로드 중 오류 발생:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // 댓글 추가 함수
-  const addComment = () => {
+  // 댓글 추가 함수 수정
+  const addComment = async () => {
     if (!nickname.trim() || !commentContent.trim() || !result) return;
     
-    const newComment: Comment = {
-      id: Date.now().toString(),
-      nickname: nickname.trim(),
-      content: commentContent.trim(),
-      timestamp: Date.now(),
-      mbtiType: result,
-      rating: rating
-    };
-    
-    const updatedComments = [newComment, ...comments];
-    setComments(updatedComments);
-    localStorage.setItem('mbti-comments', JSON.stringify(updatedComments));
-    
-    // 입력 필드 초기화
-    setNickname("");
-    setCommentContent("");
-    setRating(5);
-    setCommentModalOpen(false); // 모달 닫기
+    try {
+      setIsLoading(true);
+      
+      const commentData = {
+        nickname: nickname.trim(),
+        content: commentContent.trim(),
+        timestamp: Date.now(),
+        mbtiType: result,
+        rating: rating
+      };
+      
+      const response = await fetch('/api/comments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(commentData),
+      });
+      
+      if (!response.ok) {
+        throw new Error('댓글 추가에 실패했습니다');
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // 댓글 목록 새로고침
+        loadComments();
+        
+        // 입력 필드 초기화
+        setNickname("");
+        setCommentContent("");
+        setRating(5);
+        setCommentModalOpen(false); // 모달 닫기
+      } else {
+        console.error('댓글 추가 실패:', data.message);
+      }
+    } catch (error) {
+      console.error('댓글 추가 중 오류 발생:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleRetakeTest = () => {
@@ -265,8 +303,9 @@ export const ResultCard = () => {
             <Button 
               onClick={() => setCommentModalOpen(true)} 
               className="px-6 py-2"
+              disabled={isLoading}
             >
-              새 댓글 작성하기
+              {isLoading ? "로딩 중..." : "새 댓글 작성하기"}
             </Button>
           </div>
           
@@ -285,6 +324,7 @@ export const ResultCard = () => {
                     value={nickname}
                     onChange={(e) => setNickname(e.target.value)}
                     maxLength={20}
+                    disabled={isLoading}
                   />
                 </div>
                 {/* 별점 선택 UI */}
@@ -297,6 +337,7 @@ export const ResultCard = () => {
                         type="button"
                         onClick={() => setRating(star)}
                         className="p-1"
+                        disabled={isLoading}
                       >
                         <Star
                           className={`w-6 h-6 ${
@@ -317,15 +358,16 @@ export const ResultCard = () => {
                     value={commentContent}
                     onChange={(e) => setCommentContent(e.target.value)}
                     maxLength={200}
+                    disabled={isLoading}
                   />
                 </div>
               </div>
               <DialogFooter>
-                <Button onClick={() => setCommentModalOpen(false)} className="w-full sm:w-auto bg-muted/50 hover:bg-muted/70 text-foreground">
+                <Button onClick={() => setCommentModalOpen(false)} className="w-full sm:w-auto bg-muted/50 hover:bg-muted/70 text-foreground" disabled={isLoading}>
                   취소
                 </Button>
-                <Button onClick={addComment} className="w-full sm:w-auto">
-                  등록하기
+                <Button onClick={addComment} className="w-full sm:w-auto" disabled={isLoading}>
+                  {isLoading ? "처리 중..." : "등록하기"}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -337,10 +379,14 @@ export const ResultCard = () => {
               댓글 ({comments.length})
             </h4>
             
-            {currentComments.length > 0 ? (
+            {isLoading && comments.length === 0 ? (
+              <p className="text-center text-foreground/70 text-sm py-4">
+                댓글을 불러오는 중...
+              </p>
+            ) : currentComments.length > 0 ? (
               <div className="space-y-3">
                 {currentComments.map((comment) => (
-                  <div key={comment.id} className="p-3 bg-muted/20 rounded-md border border-border/20">
+                  <div key={comment.id || comment._id} className="p-3 bg-muted/20 rounded-md border border-border/20">
                     <div className="flex justify-between items-center mb-2">
                       <div className="font-medium text-foreground/90">
                         {comment.nickname} <span className="text-xs text-primary">({comment.mbtiType})</span>
